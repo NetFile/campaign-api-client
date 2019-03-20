@@ -16,7 +16,7 @@ with open('../resources/config.json', 'r') as f:
     config = json.load(f)
 
 # Variables below are set in resources/config.json file
-env = 'dev'
+env = 'preview'
 
 # Subscription id can be stored in config
 subscription_id = config[env.upper()]['SUBSCRIPTION_ID']
