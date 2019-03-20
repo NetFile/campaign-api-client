@@ -220,7 +220,7 @@ class SyncSessionCommandType(Enum):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process Campaign API Sync Requests')
     parser.add_argument('--sync-topics', nargs=1, metavar='Comma Separated List of Topics',
-                        help='Find existing active subscription and sync topics')
+                        help='Find existing active subscription, or create new one, and sync topics')
 
     args = parser.parse_args()
 

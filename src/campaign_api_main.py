@@ -32,23 +32,13 @@ def main():
         if sys_report['generalStatus'].lower() == 'ready':
             logger.info('Campaign API Sync is Ready')
 
-            # Retrieve available SyncFeeds
-            logger.info('Retrieving available sync feed')
-            feedsQr = api_client.retrieve_sync_feeds()
-
-            # TODO - The feeds QR contains global_filing_v101, global_address_v101, cal_v101, and pubfi_v101. Is this correct given that we are getting the feeds from /cal/v101/sync/feeds?
-            feed = feedsQr['results'][0]
-
-            # Create SyncSubscription or use existing SyncSubscription with feed specified
+            # Create SyncSubscription or use existing SyncSubscription with cal_v101 feed specified
             name = 'My Campaign API Feed'
-
+            feed_name = 'cal_v101'
             if not subscription_id:
-                logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed['name'])
-                subscription_response = api_client.create_subscription(feed['name'], name)
+                logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
+                subscription_response = api_client.create_subscription(feed_name, name)
                 subscription = subscription_response['subscription']
-
-                # Create SyncSession
-                logger.info('Creating sync session')
                 sub_id = subscription['id']
 
                 # Write Subscription ID to config.json file
