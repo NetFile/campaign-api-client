@@ -36,8 +36,9 @@ Usage
     - Create copy of config.json.example file named config.json
     - Update the API_KEY and API_PASSWORD values with API credentials provided from NetFile
 2) Use the campaign_api_client.py file as a command line utility
-    * `python campaign_api_,main.py --sync`
+    * `python campaign_api_main.py --sync-topics`
         * This process will create a subscription and synchronize data for all topics specified. An existing subscription will be used if one has already been created
+        * example: python campaign_api_client.py --sync-topics filing-activities,element-activities
     * `python campaign_api_,main.py --help`
 
 System Requirements

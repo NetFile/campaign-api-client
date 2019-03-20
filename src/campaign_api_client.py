@@ -245,9 +245,6 @@ if __name__ == '__main__':
                     logger.info('Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
                     subscription_response = campaign_api_client.create_subscription(feed_name, subscription_name)
                     subscription = subscription_response['subscription']
-
-                    # Create SyncSession
-                    logger.info('Creating sync session')
                     sub_id = subscription['id']
 
                     # Write Subscription ID to config.json file
@@ -256,7 +253,7 @@ if __name__ == '__main__':
                     sub_id = subscription_id
 
                 # Create SyncSession
-                logger.info('Creating new session')
+                logger.info('Creating sync session')
                 sync_session_response = campaign_api_client.create_session(sub_id)
                 if sync_session_response['syncDataAvailable']:
                     sync_session = sync_session_response['session']
