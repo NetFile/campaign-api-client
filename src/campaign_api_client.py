@@ -104,7 +104,7 @@ class CampaignApiClient:
         url = self.base_url + Routes.SYNC_SESSION_COMMAND % (session_id, session_command_type)
         return self.post_http_request(url)
 
-    def fetch_sync_topics(self, session_id, topic, limit=1000, offset=0):
+    def fetch_sync_topic(self, session_id, topic, limit=1000, offset=0):
         logger.debug(f'Fetching {topic} topic: offset={offset}, limit={limit}\n')
         params = {'limit': limit, 'offset': offset}
         url = f'{self.base_url}/{Routes.SYNC_SESSIONS}/{session_id}/{topic}'
@@ -183,6 +183,18 @@ class CampaignApiClient:
                 f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         return response.json()
 
+    def sync_topic(self, session_id, topic_name, page_size):
+        offset = 0
+        hasNextPage = True
+        while hasNextPage:
+            qr = self.fetch_sync_topic(session_id, topic_name, page_size, offset)
+            hasNextPage = qr['hasNextPage']
+            offset = offset + page_size
+
+            # TODO - Plug in your logic to handle the query results here
+            # for activity in qr['results']:
+            #     print(activity)
+
 
 def write_subscription_id(id_arg):
     config[env.upper()]['SUBSCRIPTION_ID'] = id_arg
@@ -207,27 +219,8 @@ class SyncSessionCommandType(Enum):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process Campaign API Sync Requests')
-    parser.add_argument('--sync', nargs=1, metavar='Subscription_Name',
-                        help='Find existing active subscription and sync available Feed Topics')
-    parser.add_argument('--re-sync', nargs=1, metavar='subscription_id',
-                        help='Find existing active subscription and sync available Feed Topics')
-    parser.add_argument('--subscribe-and-sync', nargs=1, metavar='Subscription_Name',
-                        help='Create a new subscription and Sync available Feed Topics')
-    parser.add_argument('--database', nargs=1, metavar='[create or rebuild]',
-                        help='Create or Rebuild a local database schema')
-    parser.add_argument('--create-subscription', nargs=2, metavar=('feed_name', 'subscription_name'),
-                        help='Create a new subscription')
-    parser.add_argument('--cancel-subscription', nargs=1, metavar='subscription_id', help='Cancel an existing subscription')
-    parser.add_argument('--create-session', nargs=1, metavar='subscription_id',
-                        help='Create a new session')
-    parser.add_argument('--session', nargs=2, metavar=('[cancel, or complete]', 'session_id'),
-                        help='Cancel or complete a session')
-    parser.add_argument('--sync-topic', nargs=2, metavar=('session_id', 'topic_name'),
-                        help='sync a feed topic')
-    parser.add_argument('--system-report', action='store_true',
-                        help='Retrieve general system status')
-    parser.add_argument('--feed', action='store_true',
-                        help='retrieve available feeds')
+    parser.add_argument('--sync-topics', nargs=1, metavar='Comma Separated List of Topics',
+                        help='Find existing active subscription and sync topics')
 
     args = parser.parse_args()
 
@@ -238,24 +231,19 @@ if __name__ == '__main__':
         if sys_report['generalStatus'].lower() != 'ready':
             logger.error('The Campaign API is not ready, current status is %s', sys_report['generalStatus'])
             sys.exit()
-        if args.sync:
+        if args.sync_topics:
             logger.info('Subscribe and sync Filing Activities and Element Activities')
-            # Retrieve available SyncFeeds
-            feedsQr = campaign_api_client.retrieve_sync_feeds()
 
-            # TODO - The feeds QR contains global_filing_v101, global_address_v101, cal_v101, and pubfi_v101. Is this correct given that we are getting the feeds from /cal/v101/sync/feeds?
-            feed = feedsQr['results'][0]
-
-            logger.info('Sync Feed retrieved: %s', feed)
-
-            # Create SyncSubscription or use existing SyncSubscription with feed specified
-            subscription_name = args.sync[0]
+            # Create SyncSubscription or use existing SyncSubscription
+            subscription_name = "My Sync Subscription"
+            topics = args.sync_topics[0].split(",")
             sync_session = None
+            feed_name = 'cal_v101'
             try:
                 # Create SyncSubscription or use existing SyncSubscription with feed specified
                 if not subscription_id:
-                    logger.info('Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed['name'])
-                    subscription_response = campaign_api_client.create_subscription(feed['name'], subscription_name)
+                    logger.info('Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
+                    subscription_response = campaign_api_client.create_subscription(feed_name, subscription_name)
                     subscription = subscription_response['subscription']
 
                     # Create SyncSession
@@ -275,15 +263,12 @@ if __name__ == '__main__':
                     sess_id = sync_session['id']
 
                     # Sync all available topics
-                    for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
-                        offset = 0
+                    # for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
+                    for topic in topics:
                         page_size = 50
                         logger.info(f'Synchronizing {topic}')
                         session_id = sync_session['id']
-                        query_results = campaign_api_client.fetch_sync_topics(session_id, topic, page_size, offset)
-                        while query_results['hasNextPage']:
-                            offset = offset + page_size
-                            query_results = campaign_api_client.fetch_sync_topics(session_id, topic, page_size, offset)
+                        campaign_api_client.sync_topic(session_id, topic, page_size)
 
                     # Complete SyncSession
                     logger.info('Completing session')
@@ -295,61 +280,8 @@ if __name__ == '__main__':
                 # Cancel Session on error
                 if sync_session is not None:
                     campaign_api_client.execute_session_command(sync_session.id, SyncSessionCommandType.Cancel.name)
-                logger.error('Error attempting to subscribe and sync: %s', ex)
+                logger.error('Error attempting to sync: %s', ex)
                 sys.exit()
-        elif args.system_report:
-            logger.info('Fetching system report')
-            report = campaign_api_client.fetch_system_report()
-            logger.info('General Status: %s', report.general_status)
-            logger.info('System Name: %s', report.name)
-            for component in report.components:
-                logger.info('\tComponent Name: %s', component.name)
-                logger.info('\tComponent Message: %s', component.message)
-                logger.info('\tComponent status: %s', component.status)
-        elif args.feed:
-            logger.info('Retrieving sync feed')
-            sync_feeds = campaign_api_client.retrieve_sync_feeds()
-            sync_feed = sync_feeds[0]
-            logger.info('Sync Feed retrieved: %s', sync_feed)
-        elif args.create_subscription:
-            feed_name = args.create_subscription[0]
-            subscription_name = args.create_subscription[1]
-            logger.info('Creating new sync subscription with name %s', subscription_name)
-            sub_response = campaign_api_client.create_subscription(feed_name, subscription_name)
-            logger.info('New sync subscription created: %s', sub_response.subscription)
-        elif args.cancel_subscription:
-            subscription_id = args.cancel_subscription[0]
-            sub_response = campaign_api_client.execute_subscription_command(subscription_id, SyncSubscriptionCommandType.Cancel.name)
-            logger.info('Canceled subscription: %s', sub_response.subscription)
-        elif args.create_session:
-            subscription_id = args.create_session[0]
-            logger.info('Creating new sync session with subscription %s', subscription_id)
-            sub_response = campaign_api_client.create_session(subscription_id)
-            logger.info('New sync session created: %s', sub_response.session)
-        elif args.session:
-            command = args.session[0]
-            if command == 'cancel':
-                sess_id = args.session[1]
-                sess_response = campaign_api_client.execute_session_command(sess_id, SyncSessionCommandType.Cancel.name)
-                logger.info('Session canceled: %s', sess_response.session)
-            elif command == 'complete':
-                sess_id = args.session[1]
-                try:
-                    sess_response = campaign_api_client.execute_session_command(sess_id, SyncSessionCommandType.Complete.name)
-                    logger.info('Sync Session complete: %s', sess_response.session)
-                except Exception as ex:
-                    logger.error('Error attempting to complete session with ID %s: %s', sess_id, ex)
-        elif args.sync_topic:
-            sess_id = args.sync_topic[0]
-            topic_name = args.sync_topic[1]
-            offset = 0
-            page_size = 1000
-            campaign_api_client.fetch_sync_topics(sess_id, topic_name, page_size, offset)
-
-            query_results = campaign_api_client.fetch_sync_topics(sess_id, topic_name, page_size, offset)
-            while query_results['hasNextPage']:
-                offset = offset + page_size
-                query_results = campaign_api_client.fetch_sync_topics(sess_id, topic_name, page_size, offset)
     except Exception as ex:
         logger.error('Error running Campaign API client %s', ex)
         sys.exit()

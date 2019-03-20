@@ -20,7 +20,6 @@ def main():
     4) Synchronize Element Activities
     5) Synchronize Transaction Activities
     5) Complete the SyncSession. This will be the end of the session
-    6) Cancel the SyncSubscription. SyncSubscriptions are long living, and do not need to be canceled between SyncSessions
     """
     sync_session = None
     api_client = None
@@ -57,8 +56,6 @@ def main():
             else:
                 sub_id = subscription_id
 
-            # subscription_response = api_client.create_subscription(feed['name'], name)
-
             # Create SyncSession
             logger.info('Creating sync session')
             sync_session_response = api_client.create_session(sub_id)
@@ -70,20 +67,16 @@ def main():
                     logger.info(f'Synchronizing {topic}')
                     sync_session = sync_session_response['session']
                     session_id = sync_session['id']
-                    query_results = api_client.fetch_sync_topics(session_id, topic, page_size, offset)
+                    query_results = api_client.fetch_sync_topic(session_id, topic, page_size, offset)
                     print_query_results(query_results)
                     while query_results['hasNextPage']:
                         offset = offset + page_size
-                        query_results = api_client.fetch_sync_topics(session_id, topic, page_size, offset)
+                        query_results = api_client.fetch_sync_topic(session_id, topic, page_size, offset)
                         print_query_results(query_results)
 
                 # Complete SyncSession
                 logger.info('Completing sync session')
                 api_client.execute_session_command(session_id, SyncSessionCommandType.Complete.name)
-
-                # Optionally, Cancel the subscription. Only done when no further use of subscription is required
-                # logger.info('Canceling subscription')
-                # api_client.execute_subscription_command(sub_id, SyncSessionCommandType.Cancel.name)
 
                 logger.info('Synchronization lifecycle complete')
             else:
