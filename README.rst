@@ -21,7 +21,7 @@ Basic of the Sync Process
     6. This will be the usual Sync life cycle.
         * However, the Sync Subscription can be Canceled if needed, and the process will begin from scratch
 
-Included in the project is a script named campaign_api_main.py. This script contains example usage of the campaign_api_client.py file by demonstrating the complete process of syncing lobbyist data. This includes.
+Included in the project is a script named campaign_api_main.py. This script contains example usage of the campaign_api_client.py file by demonstrating the complete process of syncing campaign data. This includes.
     - Check system status to verify the Campaign API is available and in a ready state
     - Creates a Sync Subscription
     - Creates a Sync Session for the Sync Subscription. This will track whether or not your sync feed is up to date, or if there is more data available to sync
@@ -36,9 +36,9 @@ Usage
     - Create copy of config.json.example file named config.json
     - Update the API_KEY and API_PASSWORD values with API credentials provided from NetFile
 2) Use the campaign_api_client.py file as a command line utility
-    * `python lobbyist_api_,main.py --sync`
+    * `python campaign_api_,main.py --sync`
         * This process will create a subscription and synchronize data for all topics specified. An existing subscription will be used if one has already been created
-    * `python lobbyist_api_,main.py --help`
+    * `python campaign_api_,main.py --help`
 
 System Requirements
 -------------------
@@ -48,7 +48,7 @@ Required libraries (These can be installed using Pip (example: $ pip install req
     - Requests Library
 
 
-Log level output and Lobbyist API target environment are specified in lobbyist_api_client/src/__init__.py file
+Log level output and Campaign API target environment are specified in campaign_api_client/src/__init__.py file
 
 **Provided and supported by NetFile, Inc. The largest provider of Campaign and SEI services in California.**
 

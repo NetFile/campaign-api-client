@@ -8,4 +8,4 @@ setup(name='Campaign API Client',
       author_email='krieg@netfile.com',
       license='MIT',
       packages=['campaign-api-client'],
-      zip_safe=False, install_requires=['requests', 'psycopg2'])
+      zip_safe=False, install_requires=['requests'])
