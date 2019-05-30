@@ -19,7 +19,9 @@ with open('../resources/config.json', 'r') as f:
 env = 'preview'
 
 # Subscription id can be stored in config
-subscription_id = config[env.upper()]['SUBSCRIPTION_ID']
+cal_subscription_id = config[env.upper()]['CAL_SUBSCRIPTION_ID']
+global_subscription_id = config[env.upper()]['GLOBAL_SUBSCRIPTION_ID']
+
 # Base URL of the API. Example - "https://netfile.com/filing/api"
 api_url = config[env.upper()]['API_URL']
 # Username credential to authenticate against the Campaign API
