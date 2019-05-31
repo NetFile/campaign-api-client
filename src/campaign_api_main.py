@@ -52,7 +52,7 @@ def main():
             sync_session_response = api_client.create_session(domain, sub_id)
             if sync_session_response['syncDataAvailable']:
                 # Sync all available topics
-                for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
+                for topic in ['filing-activities', 'element-activities', 'transaction-activities', 'unitemized-transaction-activities']:
                     offset = 0
                     page_size = 50
                     logger.info(f'Synchronizing {topic}')
