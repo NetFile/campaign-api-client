@@ -23,9 +23,10 @@ def main():
     """
     sync_session = None
     api_client = None
-    domain = 'cal'
+    domain = 'CAL'
+    agency_id = 'SFO'
     try:
-        logger.info('Starting Campaign API synchronization lifecycle')
+        logger.info(f'Starting {domain} Campaign API synchronization lifecycle for Agency {agency_id}')
         api_client = CampaignApiClient(api_url, api_key, api_password)
 
         # Verify the system is ready
@@ -38,7 +39,7 @@ def main():
             feed_name = 'cal_v101'
             if not cal_subscription_id:
                 logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
-                subscription_response = api_client.create_subscription(domain, feed_name, name)
+                subscription_response = api_client.create_subscription(domain, agency_id, feed_name, name)
                 subscription = subscription_response['subscription']
                 sub_id = subscription['id']
 
@@ -49,25 +50,25 @@ def main():
 
             # Create SyncSession
             logger.info('Creating sync session')
-            sync_session_response = api_client.create_session(domain, sub_id)
+            sync_session_response = api_client.create_session(domain, agency_id, sub_id)
             if sync_session_response['syncDataAvailable']:
                 # Sync all available topics
                 for topic in ['filing-activities', 'element-activities', 'transaction-activities', 'unitemized-transaction-activities']:
                     offset = 0
-                    page_size = 50
+                    page_size = 1000
                     logger.info(f'Synchronizing {topic}')
                     sync_session = sync_session_response['session']
                     session_id = sync_session['id']
-                    query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
+                    query_results = api_client.fetch_sync_topic(domain, agency_id, session_id, topic, page_size, offset)
                     print_query_results(query_results)
                     while query_results['hasNextPage']:
                         offset = offset + page_size
-                        query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
+                        query_results = api_client.fetch_sync_topic(domain, agency_id, session_id, topic, page_size, offset)
                         print_query_results(query_results)
 
                 # Complete SyncSession
                 logger.info('Completing sync session')
-                api_client.execute_session_command(domain, session_id, SyncSessionCommandType.Complete.name)
+                api_client.execute_session_command(domain, agency_id, session_id, SyncSessionCommandType.Complete.name)
 
                 logger.info('Synchronization lifecycle complete\n\n')
             else:
@@ -78,7 +79,7 @@ def main():
         # Cancel Session on error
         if sync_session is not None:
             logger.info('Error occurred, canceling sync session')
-            api_client.execute_session_command(domain, sync_session.id, SyncSessionCommandType.Cancel.name)
+            api_client.execute_session_command(domain, agency_id, sync_session.id, SyncSessionCommandType.Cancel.name)
         logger.error('Error running CampaignApiClient: %s', ex)
 
     """
@@ -91,9 +92,9 @@ def main():
     """
     sync_session = None
     api_client = None
-    domain = 'global'
+    domain = 'Global'
     try:
-        logger.info('Starting Campaign API synchronization lifecycle')
+        logger.info(f'Starting {domain} Campaign API synchronization lifecycle for Agency {agency_id}')
         api_client = CampaignApiClient(api_url, api_key, api_password)
 
         # Verify the system is ready
@@ -106,7 +107,7 @@ def main():
             feed_name = 'global_geo_activity_v101'
             if not global_subscription_id:
                 logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
-                subscription_response = api_client.create_subscription(domain, feed_name, name)
+                subscription_response = api_client.create_subscription(domain, agency_id, feed_name, name)
                 subscription = subscription_response['subscription']
                 sub_id = subscription['id']
 
@@ -117,25 +118,29 @@ def main():
 
             # Create SyncSession
             logger.info('Creating sync session')
-            sync_session_response = api_client.create_session(domain, sub_id)
+            sync_session_response = api_client.create_session(domain, agency_id, sub_id)
             if sync_session_response['syncDataAvailable']:
                 # Sync all available topics
                 for topic in ['geocode-activities', 'link-activities']:
                     offset = 0
-                    page_size = 50
+                    page_size = 1000
                     logger.info(f'Synchronizing {topic}')
                     sync_session = sync_session_response['session']
                     session_id = sync_session['id']
-                    query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
+                    query_results = api_client.fetch_sync_topic(domain, agency_id, session_id, topic, page_size, offset)
                     print_query_results(query_results)
                     while query_results['hasNextPage']:
                         offset = offset + page_size
-                        query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
+                        query_results = api_client.fetch_sync_topic(domain, agency_id, session_id, topic, page_size, offset)
                         print_query_results(query_results)
 
                 # Complete SyncSession
                 logger.info('Completing sync session')
-                api_client.execute_session_command(domain, session_id, SyncSessionCommandType.Complete.name)
+                api_client.execute_session_command(domain, agency_id, session_id, SyncSessionCommandType.Complete.name)
+
+                # Optionally, Cancel the subscription. Only done when no further use of subscription is required
+                logger.info('Canceling subscription')
+                api_client.execute_subscription_command(domain, agency_id, sub_id, SyncSessionCommandType.Cancel.name)
 
                 logger.info('Synchronization lifecycle complete')
             else:
@@ -146,7 +151,7 @@ def main():
         # Cancel Session on error
         if sync_session is not None:
             logger.info('Error occurred, canceling sync session')
-            api_client.execute_session_command(domain, sync_session.id, SyncSessionCommandType.Cancel.name)
+            api_client.execute_session_command(domain, agency_id, sync_session.id, SyncSessionCommandType.Cancel.name)
         logger.error('Error running CampaignApiClient: %s', ex)
     sys.exit()
 
