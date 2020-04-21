@@ -180,7 +180,7 @@ class CampaignApiClient:
             response = requests.post(url, auth=(self.user, self.password), data=json.dumps(
                 body), headers=self.headers, params=params)
         except Exception as ex:
-            logger.info(ex)
+            logger.error(ex)
             sys.exit()
         if response.status_code not in [200, 201]:
             raise Exception(
@@ -196,7 +196,7 @@ class CampaignApiClient:
             response = requests.get(url, params=params, auth=(
                 self.user, self.password), headers=headers)
         except Exception as ex:
-            logger.info(ex)
+            logger.error(ex)
             sys.exit()
         if response.status_code not in [200, 201]:
             raise Exception(
