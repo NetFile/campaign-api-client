@@ -48,6 +48,27 @@ class CampaignApiClient:
         self.user = api_key
         self.password = api_password
         self.agency_id = agency_id
+        self.session = requests.Session()
+
+    def __enter__(self):
+        """
+            This runs as the with block is set up.
+            """
+        return self
+
+    def __exit__(self, exc_type=None, exc_value=None, traceback=None):
+        """
+            This runs at the end of a with block. It simply closes the client.
+            Exceptions are propagated forward in the program as usual, and
+                are not handled here.
+            """
+        self.close()
+
+    def close(self):
+        """
+        Close the session.
+        """
+        self.session.close()
 
     def fetch_system_report(self):
         logger.debug('Checking to verify the Campaign API system is ready')
@@ -165,7 +186,7 @@ class CampaignApiClient:
         logger.debug('Fetching Efile Content')
         url = self.base_url + Routes.FETCH_EFILE_CONTENT % root_filing_nid
         logger.debug(f'Making GET HTTP request to {url}')
-        response = requests.get(url, params={'contentType': 'efile'}, auth=(
+        response = self.session.get(url, params={'contentType': 'efile'}, auth=(
             self.user, self.password), headers=self.headers)
         if response.status_code not in [200, 201]:
             raise Exception(
@@ -177,7 +198,7 @@ class CampaignApiClient:
         logger.debug(f'Making POST HTTP request to {url}')
         try:
             params = {'aid': self.agency_id}
-            response = requests.post(url, auth=(self.user, self.password), data=json.dumps(
+            response = self.session.post(url, auth=(self.user, self.password), data=json.dumps(
                 body), headers=self.headers, params=params)
         except Exception as ex:
             logger.error(ex)
@@ -193,7 +214,7 @@ class CampaignApiClient:
         if headers is None:
             headers = self.headers
         try:
-            response = requests.get(url, params=params, auth=(
+            response = self.session.get(url, params=params, auth=(
                 self.user, self.password), headers=headers)
         except Exception as ex:
             logger.error(ex)
@@ -249,70 +270,70 @@ if __name__ == '__main__':
     # First make sure that the Campaign API is ready
     default_domain = 'cal'
     default_agency_id = 'SFO'
-    campaign_api_client = CampaignApiClient(
-        api_url, api_key, api_password, default_agency_id)
-    sys_report = campaign_api_client.fetch_system_report()
-    try:
-        if sys_report['generalStatus'].lower() != 'ready':
-            logger.error(
-                'The Campaign API is not ready, current status is %s', sys_report['generalStatus'])
-            sys.exit()
-        if args.sync_topics:
-            logger.info(
-                'Subscribe and sync Filing Activities and Element Activities')
-
-            # Create SyncSubscription or use existing SyncSubscription
-            subscription_name = "My Sync Subscription"
-            topics = args.sync_topics[0].split(",")
-            sync_session = None
-            feed_name = 'cal_v101'
-            try:
-                # Create SyncSubscription or use existing SyncSubscription with feed specified
-                if not cal_subscription_id:
-                    logger.info(
-                        'Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
-                    subscription_response = campaign_api_client.create_subscription(
-                        default_domain, feed_name, subscription_name)
-                    subscription = subscription_response['subscription']
-                    sub_id = subscription['id']
-
-                    # Write Subscription ID to config.json file
-                    write_subscription_id(sub_id)
-                else:
-                    sub_id = cal_subscription_id
-
-                # Create SyncSession
-                logger.info('Creating sync session')
-                sync_session_response = campaign_api_client.create_session(
-                    default_domain, sub_id)
-                if sync_session_response['syncDataAvailable']:
-                    sync_session = sync_session_response['session']
-                    sess_id = sync_session['id']
-
-                    # Sync all available topics
-                    # for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
-                    for topic in topics:
-                        page_size = 1000
-                        logger.info(f'Synchronizing {topic}')
-                        session_id = sync_session['id']
-                        campaign_api_client.sync_topic(
-                            default_domain, session_id, topic, page_size)
-
-                    # Complete SyncSession
-                    logger.info('Completing session')
-                    campaign_api_client.execute_session_command(
-                        default_domain, sess_id, SyncSessionCommandType.Complete.name)
-                    logger.info('Sync complete')
-                else:
-                    logger.info(
-                        'The Campaign API system has no sync data available')
-            except Exception as ex:
-                # Cancel Session on error
-                if sync_session is not None:
-                    campaign_api_client.execute_session_command(
-                        default_domain, sync_session.id, SyncSessionCommandType.Cancel.name)
-                logger.error('Error attempting to sync: %s', ex)
+    with CampaignApiClient(
+        api_url, api_key, api_password, default_agency_id) as campaign_api_client:
+        sys_report = campaign_api_client.fetch_system_report()
+        try:
+            if sys_report['generalStatus'].lower() != 'ready':
+                logger.error(
+                    'The Campaign API is not ready, current status is %s', sys_report['generalStatus'])
                 sys.exit()
-    except Exception as ex:
-        logger.error('Error running Campaign API client %s', ex)
-        sys.exit()
+            if args.sync_topics:
+                logger.info(
+                    'Subscribe and sync Filing Activities and Element Activities')
+
+                # Create SyncSubscription or use existing SyncSubscription
+                subscription_name = "My Sync Subscription"
+                topics = args.sync_topics[0].split(",")
+                sync_session = None
+                feed_name = 'cal_v101'
+                try:
+                    # Create SyncSubscription or use existing SyncSubscription with feed specified
+                    if not cal_subscription_id:
+                        logger.info(
+                            'Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
+                        subscription_response = campaign_api_client.create_subscription(
+                            default_domain, feed_name, subscription_name)
+                        subscription = subscription_response['subscription']
+                        sub_id = subscription['id']
+
+                        # Write Subscription ID to config.json file
+                        write_subscription_id(sub_id)
+                    else:
+                        sub_id = cal_subscription_id
+
+                    # Create SyncSession
+                    logger.info('Creating sync session')
+                    sync_session_response = campaign_api_client.create_session(
+                        default_domain, sub_id)
+                    if sync_session_response['syncDataAvailable']:
+                        sync_session = sync_session_response['session']
+                        sess_id = sync_session['id']
+
+                        # Sync all available topics
+                        # for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
+                        for topic in topics:
+                            page_size = 1000
+                            logger.info(f'Synchronizing {topic}')
+                            session_id = sync_session['id']
+                            campaign_api_client.sync_topic(
+                                default_domain, session_id, topic, page_size)
+
+                        # Complete SyncSession
+                        logger.info('Completing session')
+                        campaign_api_client.execute_session_command(
+                            default_domain, sess_id, SyncSessionCommandType.Complete.name)
+                        logger.info('Sync complete')
+                    else:
+                        logger.info(
+                            'The Campaign API system has no sync data available')
+                except Exception as ex:
+                    # Cancel Session on error
+                    if sync_session is not None:
+                        campaign_api_client.execute_session_command(
+                            default_domain, sync_session.id, SyncSessionCommandType.Cancel.name)
+                    logger.error('Error attempting to sync: %s', ex)
+                    sys.exit()
+        except Exception as ex:
+            logger.error('Error running Campaign API client %s', ex)
+            sys.exit()
