@@ -15,7 +15,7 @@ class Routes:
     SYSTEM_REPORT = '/system'
     SYNC_FEED = '/%s/v101/sync/feeds'
     SYNC_SUBSCRIPTIONS = '/%s/v101/sync/subscriptions'
-    SYNC_SESSIONS = '/%s/v101/sync/sessions'
+    SYNC_SESSIONS = '%s/v101/sync/sessions'
 
     # First parameter is Session ID. Second parameter is Command Type
     SYNC_SESSION_COMMAND = '/%s/v101/sync/sessions/%s/commands/%s'
@@ -41,8 +41,7 @@ class CampaignApiClient:
 
     def __init__(self, base_url, api_key, api_password, agency_id):
         self.headers = {
-            'Content-type': 'application/json',
-            'Accept': 'application/json'
+            'Content-Type': 'application/json'
         }
         self.base_url = base_url
         self.user = api_key
@@ -91,12 +90,15 @@ class CampaignApiClient:
         url = self.base_url + ext + '/peek'
         return self.get_http_request(url)
 
-    def create_subscription(self, domain, feed_name_arg, subscription_name_arg):
+    def create_subscription(self, domain, feed_name_arg, subscription_name_arg, filter_aid):
         logger.debug('Creating a SyncSubscription')
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % (domain)
         body = {
             'feedName': feed_name_arg,
-            'name': subscription_name_arg
+            'name': subscription_name_arg,
+            'filter': {
+                'aid': filter_aid
+            }
         }
         return self.post_http_request(url, body)
 
@@ -124,24 +126,25 @@ class CampaignApiClient:
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % domain
         return self.get_http_request(url, params)
 
-    def create_session(self, domain, sub_id):
+    def create_session(self, domain, sub_id, seq_range_limit=10000):
         logger.debug(f'Creating a SyncSession using SyncSubscription {sub_id}')
         url = f'{self.base_url}/{Routes.SYNC_SESSIONS % domain}'
+        body = {
+            'subscriptionId': sub_id,
+            'sequenceRangeLimit': seq_range_limit
+        }
+        return self.post_http_request(url, body)
+
+    def execute_session_command(self, domain, session_id, session_command_type, sub_id):
+        logger.debug(f'Executing {session_command_type} SyncSession command')
+        url = self.base_url + Routes.SYNC_SESSION_COMMAND % (domain, session_id, session_command_type)
         body = {
             'subscriptionId': sub_id
         }
         return self.post_http_request(url, body)
 
-    def execute_session_command(self, domain, session_id, session_command_type):
-        logger.debug(f'Executing {session_command_type} SyncSession command')
-        url = self.base_url + \
-            Routes.SYNC_SESSION_COMMAND % (
-                domain, session_id, session_command_type)
-        return self.post_http_request(url)
-
     def fetch_sync_topic(self, domain, session_id, topic, limit=1000, offset=0):
-        logger.debug(
-            f'Fetching {topic} topic: offset={offset}, limit={limit}\n')
+        logger.debug(f'Fetching {topic} topic: offset={offset}, limit={limit}\n')
         params = {'limit': limit, 'offset': offset}
         url = f'{self.base_url}/{Routes.SYNC_SESSIONS % domain}/{session_id}/{topic}'
         return self.get_http_request(url, params)
@@ -210,12 +213,11 @@ class CampaignApiClient:
 
     def get_http_request(self, url, params={}, headers=None):
         logger.debug(f'Making GET HTTP request to {url}')
-        params['aid'] = self.agency_id
         if headers is None:
             headers = self.headers
         try:
-            response = self.session.get(url, params=params, auth=(
-                self.user, self.password), headers=headers)
+            params['aid'] = self.agency_id
+            response = self.session.get(url, params=params, auth=(self.user, self.password), headers=headers)
         except Exception as ex:
             logger.error(ex)
             sys.exit()
@@ -293,7 +295,7 @@ if __name__ == '__main__':
                         logger.info(
                             'Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
                         subscription_response = campaign_api_client.create_subscription(
-                            default_domain, feed_name, subscription_name)
+                            default_domain, feed_name, subscription_name, default_agency_id)
                         subscription = subscription_response['subscription']
                         sub_id = subscription['id']
 
@@ -304,8 +306,7 @@ if __name__ == '__main__':
 
                     # Create SyncSession
                     logger.info('Creating sync session')
-                    sync_session_response = campaign_api_client.create_session(
-                        default_domain, sub_id)
+                    sync_session_response = campaign_api_client.create_session(default_domain, sub_id)
                     if sync_session_response['syncDataAvailable']:
                         sync_session = sync_session_response['session']
                         sess_id = sync_session['id']
@@ -316,13 +317,12 @@ if __name__ == '__main__':
                             page_size = 1000
                             logger.info(f'Synchronizing {topic}')
                             session_id = sync_session['id']
-                            campaign_api_client.sync_topic(
-                                default_domain, session_id, topic, page_size)
+                            campaign_api_client.sync_topic(default_domain, session_id, topic, page_size)
 
                         # Complete SyncSession
                         logger.info('Completing session')
                         campaign_api_client.execute_session_command(
-                            default_domain, sess_id, SyncSessionCommandType.Complete.name)
+                            default_domain, sess_id, SyncSessionCommandType.Complete.name, sub_id)
                         logger.info('Sync complete')
                     else:
                         logger.info(
@@ -331,7 +331,7 @@ if __name__ == '__main__':
                     # Cancel Session on error
                     if sync_session is not None:
                         campaign_api_client.execute_session_command(
-                            default_domain, sync_session.id, SyncSessionCommandType.Cancel.name)
+                            default_domain, sync_session.id, SyncSessionCommandType.Cancel.name, sub_id)
                     logger.error('Error attempting to sync: %s', ex)
                     sys.exit()
         except Exception as ex:
