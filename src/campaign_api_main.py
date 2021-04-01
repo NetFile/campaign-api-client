@@ -21,7 +21,8 @@ def main():
     3) Synchronize Filing Activities
     4) Synchronize Element Activities
     5) Synchronize Transaction Activities
-    5) Complete the SyncSession. This will be the end of the session
+    6) Synchronize Unitemized Transaction Activities
+    7) Complete the SyncSession. This will be the end of the session
     """
 
     domain = 'cal'
@@ -45,7 +46,6 @@ def main():
             if not cal_subscription_id:
                 logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
                 subscription_response = api_client.create_subscription(domain, feed_name, name, agency_id)
-                # subscription = subscription_response['subscription']
                 sub_id = subscription_response['id']
 
                 # Write Subscription ID to config.json file
@@ -55,15 +55,19 @@ def main():
 
             # Create SyncSession
             logger.info('Creating sync session')
-            range_limit = 10000
+            range_limit = 5000
             sync_session_response = api_client.create_session(domain, sub_id, range_limit)
 
             # TODO - Fetch Feeds and Topics
             feeds = api_client.retrieve_sync_feeds(domain)
 
-            if sync_session_response['syncDataAvailable']:
+            sync_lifecycle_start = time.time()
+
+            while sync_session_response['syncDataAvailable']:
+                session_start = time.time()
                 # Sync all available topics
                 for topic in ['filing-activities', 'element-activities', 'transaction-activities', 'unitemized-transaction-activities']:
+                    topic_request_times = []
                     offset = 0
                     page_size = 1000
                     logger.info(f'Synchronizing {topic}')
@@ -72,21 +76,33 @@ def main():
                     start_time = time.time()
                     query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
                     end_time = time.time()
-                    print_query_results(query_results, end_time-start_time)
+                    total_time = end_time-start_time
+                    topic_request_times.append(total_time)
+                    print_query_results(query_results, total_time)
                     while query_results['hasNextPage']:
                         offset = offset + page_size
                         start_time = time.time()
                         query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
                         end_time = time.time()
-                        print_query_results(query_results, end_time-start_time)
+                        total_time = end_time-start_time
+                        topic_request_times.append(total_time)
+                        print_query_results(query_results, total_time)
+                    logger.info(f'Average time for {topic} sync read is {sum(topic_request_times) / len(topic_request_times)} seconds\n')
 
-                # Complete SyncSession
-                logger.info('Completing sync session')
+                logger.info('Completing sync session\n')
+
+                # Show SyncSession Statistics
+                session_end = time.time()
+                logger.info(f'Total time for sync session: {session_end - session_start} seconds\n')
+
                 api_client.execute_session_command(domain, session_id, SyncSessionCommandType.Complete.name, sub_id)
 
-                logger.info('Synchronization session lifecycle complete\n\n')
-            else:
-                logger.info('No Sync Data Available. Nothing to retrieve\n\n')
+                # Create a new syncSession looking for more available data to pull
+                sync_session_response = api_client.create_session(domain, sub_id, range_limit)
+
+            logger.info(f'Synchronization lifecycle complete\n\n')
+            sync_lifecycle_end = time.time()
+            logger.info(f'Total time for synchronization lifecycle: {sync_lifecycle_end - sync_lifecycle_start} seconds')
         else:
             logger.info('The Campaign API system status is %s and is not Ready', sys_report['generalStatus'])
     except Exception as ex:
