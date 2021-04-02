@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
-from src import *
 from enum import Enum
 import argparse
 import requests
+import logging
+import json
 
 import sys
-sys.path.append('../')
 
 logger = logging.getLogger(__name__)
 

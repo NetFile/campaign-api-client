@@ -4,7 +4,7 @@ import sys
 import time
 
 from campaign_api_client import CampaignApiClient, SyncSessionCommandType
-from src import *
+from __init__ import *
 
 
 def write_config_param(param, value):
