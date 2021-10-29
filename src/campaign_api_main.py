@@ -3,9 +3,9 @@
 import sys
 import time
 
-from campaign_api_client import CampaignApiClient, SyncSessionCommandType
-from src import *
 
+from src import *
+from src.campaign_api_client import CampaignApiClient, SyncSessionCommandType
 
 def write_config_param(param, value):
     config[env.upper()][param] = value
@@ -55,7 +55,7 @@ def main():
 
             # Create SyncSession
             logger.info('Creating sync session')
-            range_limit = 5000
+            range_limit = 10000
             sync_session_response = api_client.create_session(domain, sub_id, range_limit)
 
             # TODO - Fetch Feeds and Topics
