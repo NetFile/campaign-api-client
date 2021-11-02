@@ -1,15 +1,15 @@
 // Update example values and rename this file to config.json to use.
 {
-    "PREVIEW": {
-        "API_URL": "https://preview.netfile.com/api/filing",
+    "PEEK": {
+        "API_URL": "https://peek.netfile.com/api/campaign",
         "API_KEY": "a6ee0_example_2d5af22e37a90591be5",
         "API_PASSWORD": "ca89d975_example_03c4157857b42bef7a26e46",
-         "SUBSCRIPTION_ID": ""
+        "CAL_SUBSCRIPTION_ID": "5812c625-27eb-40d5-ac8e-6931d8a76fc0",
     },
     "LIVE": {
-        "API_URL": "https://netfile.com/filing/api",
-        "API_KEY": "text@example.com",
-        "API_PASSWORD": "password123",
-         "SUBSCRIPTION_ID": ""
+        "API_URL": "https://netfile.com/api/campaign",
+        "API_KEY": "a6ee0_example_2d5af22e37a90591be5",
+        "API_PASSWORD": "ca89d975_example_03c4157857b42bef7a26e46",
+        "CAL_SUBSCRIPTION_ID": "5812c625-27eb-40d5-ac8e-6931d8a76fc0",
     }
 }

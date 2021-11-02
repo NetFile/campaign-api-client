@@ -1,12 +1,12 @@
 #!/usr/bin/python
 
+import sys
+sys.path.append('../')
+
 from src import *
 from enum import Enum
 import argparse
 import requests
-
-import sys
-sys.path.append('../')
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ class CampaignApiClient:
         self.user = api_key
         self.password = api_password
         self.agency_id = agency_id
-        self.session = requests.Session()
+        self.httpSession = requests.Session()
 
     def __enter__(self):
         """
@@ -67,7 +67,7 @@ class CampaignApiClient:
         """
         Close the session.
         """
-        self.session.close()
+        self.httpSession.close()
 
     def fetch_system_report(self):
         logger.debug('Checking to verify the Campaign API system is ready')
@@ -189,11 +189,10 @@ class CampaignApiClient:
         logger.debug('Fetching Efile Content')
         url = self.base_url + Routes.FETCH_EFILE_CONTENT % root_filing_nid
         logger.debug(f'Making GET HTTP request to {url}')
-        response = self.session.get(url, params={'contentType': 'efile'}, auth=(
+        response = self.httpSession.get(url, params={'contentType': 'efile'}, auth=(
             self.user, self.password), headers=self.headers)
         if response.status_code not in [200, 201]:
-            raise Exception(
-                f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
+            raise Exception(f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         file_content = response.text
         return file_content
 
@@ -201,14 +200,13 @@ class CampaignApiClient:
         logger.debug(f'Making POST HTTP request to {url}')
         try:
             params = {'aid': self.agency_id}
-            response = self.session.post(url, auth=(self.user, self.password), data=json.dumps(
+            response = self.httpSession.post(url, auth=(self.user, self.password), data=json.dumps(
                 body), headers=self.headers, params=params)
         except Exception as ex:
             logger.error(ex)
             sys.exit()
         if response.status_code not in [200, 201]:
-            raise Exception(
-                f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
+            raise Exception( f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         return response.json()
 
     def get_http_request(self, url, params={}, headers=None):
@@ -217,7 +215,7 @@ class CampaignApiClient:
             headers = self.headers
         try:
             params['aid'] = self.agency_id
-            response = self.session.get(url, params=params, auth=(self.user, self.password), headers=headers)
+            response = self.httpSession.get(url, params=params, auth=(self.user, self.password), headers=headers)
         except Exception as ex:
             logger.error(ex)
             sys.exit()
@@ -226,16 +224,15 @@ class CampaignApiClient:
                 f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         return response.json()
 
-    def sync_topic(self, domain, session_id, topic_name, page_size):
+    def sync_topic_for_session(self, domain, session_id, topic_name, page_size):
         offset = 0
         has_next_page = True
         while has_next_page:
-            qr = self.fetch_sync_topic(
-                domain, session_id, topic_name, page_size, offset)
+            qr = self.fetch_sync_topic(domain, session_id, topic_name, page_size, offset)
             has_next_page = qr['hasNextPage']
             offset = offset + page_size
 
-            # TODO - Plug in your logic to handle the query results here
+            # TODO - Plug in your logic to handle the data here
             # for activity in qr['results']:
             #     print(activity)
 
@@ -282,7 +279,7 @@ if __name__ == '__main__':
                 sys.exit()
             if args.sync_topics:
                 logger.info(
-                    'Subscribe and sync Filing Activities and Element Activities')
+                    'Subscribe and sync topics')
 
                 # Create SyncSubscription or use existing SyncSubscription
                 subscription_name = "My Sync Subscription"
@@ -292,12 +289,9 @@ if __name__ == '__main__':
                 try:
                     # Create SyncSubscription or use existing SyncSubscription with feed specified
                     if not cal_subscription_id:
-                        logger.info(
-                            'Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
-                        subscription_response = campaign_api_client.create_subscription(
-                            default_domain, feed_name, subscription_name, default_agency_id)
-                        subscription = subscription_response['subscription']
-                        sub_id = subscription['id']
+                        logger.info('Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
+                        subscription_response = campaign_api_client.create_subscription(default_domain, feed_name, subscription_name, default_agency_id)
+                        sub_id = subscription_response['id']
 
                         # Write Subscription ID to config.json file
                         write_subscription_id(sub_id)
@@ -306,32 +300,33 @@ if __name__ == '__main__':
 
                     # Create SyncSession
                     logger.info('Creating sync session')
-                    sync_session_response = campaign_api_client.create_session(default_domain, sub_id)
-                    if sync_session_response['syncDataAvailable']:
+                    range_limit = 10000
+                    sync_session_response = campaign_api_client.create_session(default_domain, sub_id, range_limit)
+
+                    if not sync_session_response['syncDataAvailable']:
+                        logger.info('The Campaign API system has no sync data available')
+
+                    while sync_session_response['syncDataAvailable']:
                         sync_session = sync_session_response['session']
                         sess_id = sync_session['id']
 
                         # Sync all available topics
-                        # for topic in ['filing-activities', 'element-activities', 'transaction-activities']:
                         for topic in topics:
                             page_size = 1000
                             logger.info(f'Synchronizing {topic}')
                             session_id = sync_session['id']
-                            campaign_api_client.sync_topic(default_domain, session_id, topic, page_size)
+                            campaign_api_client.sync_topic_for_session(default_domain, session_id, topic, page_size)
 
                         # Complete SyncSession
                         logger.info('Completing session')
-                        campaign_api_client.execute_session_command(
-                            default_domain, sess_id, SyncSessionCommandType.Complete.name, sub_id)
-                        logger.info('Sync complete')
-                    else:
-                        logger.info(
-                            'The Campaign API system has no sync data available')
+                        campaign_api_client.execute_session_command(default_domain, sess_id, SyncSessionCommandType.Complete.name, sub_id)
+                        sync_session_response = campaign_api_client.create_session(default_domain, sub_id, range_limit)
+
+                    logger.info('Sync Complete')
                 except Exception as ex:
                     # Cancel Session on error
                     if sync_session is not None:
-                        campaign_api_client.execute_session_command(
-                            default_domain, sync_session.id, SyncSessionCommandType.Cancel.name, sub_id)
+                        campaign_api_client.execute_session_command(default_domain, sync_session.id, SyncSessionCommandType.Cancel.name, sub_id)
                     logger.error('Error attempting to sync: %s', ex)
                     sys.exit()
         except Exception as ex:

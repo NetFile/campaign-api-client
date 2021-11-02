@@ -62,6 +62,8 @@ def main():
             feeds = api_client.retrieve_sync_feeds(domain)
 
             sync_lifecycle_start = time.time()
+            if not sync_session_response['syncDataAvailable']:
+                logger.info('The Campaign API system has no sync data available')
 
             while sync_session_response['syncDataAvailable']:
                 session_start = time.time()
@@ -112,82 +114,6 @@ def main():
             api_client.execute_session_command(domain, sync_session['id'], SyncSessionCommandType.Cancel.name, sub_id)
         logger.error('Error running CampaignApiClient: %s', ex)
 
-    """
-    This demonstrates the complete lifecycle of the Campaign API sync process.
-    1) Create a Geo SyncSubscription
-    2) Create a Geo SyncSession using the SyncSubscription. This will be the start of the session
-    3) Synchronize Geocode Activities
-    4) Synchronize Geo Link Activities
-    5) Complete the SyncSession. This will be the end of the session
-    """
-    # sync_session = None
-    # api_client = None
-    # sub_id = None
-    # domain = 'Geo'
-    # try:
-    #     logger.info(f'Starting {domain} Campaign API synchronization lifecycle for Agency {agency_id}')
-    #     api_client = CampaignApiClient(
-    #         api_url, api_key, api_password, agency_id)
-    #
-    #     # Verify the system is ready
-    #     sys_report = api_client.fetch_system_report()
-    #     if sys_report['generalStatus'].lower() == 'ready':
-    #         logger.info('Campaign API Sync is Ready')
-    #
-    #         # Create SyncSubscription or use existing SyncSubscription with cal_v101 feed specified
-    #         name = 'My Geo Campaign API Feed'
-    #         feed_name = 'geo_v101'
-    #         if not global_subscription_id:
-    #             logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
-    #             subscription_response = api_client.create_subscription(domain, feed_name, name)
-    #             sub_id = subscription_response['id']
-    #
-    #             # Write Subscription ID to config.json file
-    #             write_config_param('GLOBAL_SUBSCRIPTION_ID', sub_id)
-    #         else:
-    #             sub_id = global_subscription_id
-    #
-    #         # Create SyncSession
-    #         logger.info('Creating sync session')
-    #         sync_session_response = api_client.create_session(domain, sub_id)
-    #         if sync_session_response['syncDataAvailable']:
-    #             # Sync all available topics
-    #             for topic in ['geocodes', 'geo-link-events']:
-    #                 offset = 0
-    #                 page_size = 100
-    #                 logger.info(f'Synchronizing {topic}')
-    #                 sync_session = sync_session_response['session']
-    #                 session_id = sync_session['id']
-    #                 start_time = time.time()
-    #                 query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
-    #                 end_time = time.time()
-    #                 print_query_results(query_results, end_time-start_time)
-    #                 while query_results['hasNextPage']:
-    #                     offset = offset + page_size
-    #                     start_time = time.time()
-    #                     query_results = api_client.fetch_sync_topic(domain, session_id, topic, page_size, offset)
-    #                     end_time = time.time()
-    #                     print_query_results(query_results, end_time-start_time)
-    #
-    #             # Complete SyncSession
-    #             logger.info('Completing sync session')
-    #             api_client.execute_session_command(domain, session_id, SyncSessionCommandType.Complete.name, sub_id)
-    #
-    #             # Optionally, Cancel the subscription. Only done when no further use of subscription is required
-    #             # logger.info('Canceling subscription')
-    #             # api_client.execute_subscription_command(domain, sub_id, SyncSessionCommandType.Cancel.name)
-    #
-    #             logger.info('Synchronization lifecycle complete')
-    #         else:
-    #             logger.info('No Sync Data Available. Nothing to retrieve')
-    #     else:
-    #         logger.info('The Campaign API system status is %s and is not Ready', sys_report['generalStatus'])
-    # except Exception as ex:
-    #     # Cancel Session on error
-    #     if sync_session is not None:
-    #         logger.info('Error occurred, canceling sync session')
-    #         api_client.execute_session_command(domain, sync_session.id, SyncSessionCommandType.Cancel.name, sub_id)
-    #     logger.error('Error running CampaignApiClient: %s', ex)
     sys.exit()
 
 
