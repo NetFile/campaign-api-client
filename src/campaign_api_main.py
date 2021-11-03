@@ -26,7 +26,7 @@ def main():
     7) Complete the SyncSession. This will be the end of the session
     """
 
-    domain = 'cal'
+    domain = 'filing'
     agency_id = 'TEST'
     sync_session = None
     api_client = None
@@ -42,10 +42,10 @@ def main():
 
             # Create SyncSubscription or use existing SyncSubscription with cal_v101 feed specified
             name = 'My Campaign API Feed'
-            feed_name = 'cal_v101'
+            # feed_name = 'cal_v101'
             if not cal_subscription_id:
-                logger.info('Creating new subscription with name "%s" and feed name "%s"', name, feed_name)
-                subscription_response = api_client.create_subscription(domain, feed_name, name, agency_id)
+                logger.info('Creating new "%s" subscription with name "%s"', domain, name)
+                subscription_response = api_client.create_subscription(domain, name, agency_id)
                 sub_id = subscription_response['id']
 
                 # Write Subscription ID to config.json file
@@ -56,10 +56,12 @@ def main():
             # Create SyncSession
             logger.info('Creating sync session')
             range_limit = 10000
-            sync_session_response = api_client.create_session(domain, sub_id, range_limit)
+            # sync_session_response = api_client.create_session(domain, sub_id, range_limit)
+            # TODO - Add filter examples
+            sync_session_response = api_client.create_session(sub_id, range_limit)
 
             # TODO - Fetch Feeds and Topics
-            feeds = api_client.retrieve_sync_feeds(domain)
+            feeds = api_client.retrieve_sync_feeds()
 
             sync_lifecycle_start = time.time()
             if not sync_session_response['syncDataAvailable']:
@@ -68,7 +70,7 @@ def main():
             while sync_session_response['syncDataAvailable']:
                 session_start = time.time()
                 # Sync all available topics
-                for topic in ['filing-activities', 'element-activities', 'transaction-activities', 'unitemized-transaction-activities']:
+                for topic in ['filing-activities', 'element-activities']:
                     topic_request_times = []
                     offset = 0
                     page_size = 1000
@@ -97,10 +99,10 @@ def main():
                 session_end = time.time()
                 logger.info(f'Total time for sync session: {session_end - session_start} seconds\n')
 
-                api_client.execute_session_command(domain, session_id, SyncSessionCommandType.Complete.name, sub_id)
+                api_client.execute_session_command(session_id, SyncSessionCommandType.Complete.name)
 
                 # Create a new syncSession looking for more available data to pull
-                sync_session_response = api_client.create_session(domain, sub_id, range_limit)
+                sync_session_response = api_client.create_session(sub_id, range_limit)
 
             logger.info(f'Synchronization lifecycle complete\n\n')
             sync_lifecycle_end = time.time()
@@ -108,11 +110,12 @@ def main():
         else:
             logger.info('The Campaign API system status is %s and is not Ready', sys_report['generalStatus'])
     except Exception as ex:
+        logger.error('Error running CampaignApiClient: %s', ex)
+
         # Cancel Session on error
         if sync_session is not None:
             logger.info('Error occurred, canceling sync session')
-            api_client.execute_session_command(domain, sync_session['id'], SyncSessionCommandType.Cancel.name, sub_id)
-        logger.error('Error running CampaignApiClient: %s', ex)
+            api_client.execute_session_command(sync_session['id'], SyncSessionCommandType.Cancel.name)
 
     sys.exit()
 

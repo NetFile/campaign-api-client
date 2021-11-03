@@ -13,12 +13,13 @@ logger = logging.getLogger(__name__)
 
 class Routes:
     SYSTEM_REPORT = '/system'
-    SYNC_FEED = '/%s/v101/sync/feeds'
-    SYNC_SUBSCRIPTIONS = '/%s/v101/sync/subscriptions'
-    SYNC_SESSIONS = '%s/v101/sync/sessions'
+    SYNC_FEED = '/sync/v101/feeds'
+    SYNC_SUBSCRIPTIONS = '/%s/v101/sync/subscribe'
+    SYNC_SESSIONS = '/sync/v101/sessions'
+    FETCH_SYNC_SESSION_TOPIC = '/%s/v101/sync/sessions/%s/%s'
 
     # First parameter is Session ID. Second parameter is Command Type
-    SYNC_SESSION_COMMAND = '/%s/v101/sync/sessions/%s/commands/%s'
+    SYNC_SESSION_COMMAND = '/sync/v101/sessions/%s/commands/%s'
 
     # First parameter is Subscription ID. Second parameter is Command Type
     SYNC_SUBSCRIPTION_COMMAND = '/%s/v101/sync/subscriptions/%s/commands/%s'
@@ -90,11 +91,10 @@ class CampaignApiClient:
         url = self.base_url + ext + '/peek'
         return self.get_http_request(url)
 
-    def create_subscription(self, domain, feed_name_arg, subscription_name_arg, filter_aid):
+    def create_subscription(self, domain, subscription_name_arg, filter_aid):
         logger.debug('Creating a SyncSubscription')
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % (domain)
         body = {
-            'feedName': feed_name_arg,
             'name': subscription_name_arg,
             'filter': {
                 'aid': filter_aid
@@ -129,35 +129,35 @@ class CampaignApiClient:
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % domain
         return self.get_http_request(url, params)
 
-    def create_session(self, domain, sub_id, seq_range_limit=10000):
+    def create_session(self, sub_id, seq_range_limit=10000):
         logger.debug(f'Creating a SyncSession using SyncSubscription {sub_id}')
-        url = f'{self.base_url}/{Routes.SYNC_SESSIONS % domain}'
+        url = f'{self.base_url}{Routes.SYNC_SESSIONS}'
         body = {
             'subscriptionId': sub_id,
             'sequenceRangeLimit': seq_range_limit
         }
         return self.post_http_request(url, body)
 
-    def execute_session_command(self, domain, session_id, session_command_type, sub_id):
+    def execute_session_command(self, session_id_arg, session_command_type):
         logger.debug(f'Executing {session_command_type} SyncSession command')
-        url = self.base_url + Routes.SYNC_SESSION_COMMAND % (domain, session_id, session_command_type)
-        body = {
-            'subscriptionId': sub_id
-        }
-        return self.post_http_request(url, body)
+        url = self.base_url + Routes.SYNC_SESSION_COMMAND % (session_id_arg, session_command_type)
+        # body = {
+        #     'subscriptionId': sub_id
+        # }
+        return self.post_http_request(url)
 
-    def fetch_sync_topic(self, domain, session_id, topic, limit=1000, offset=0):
-        logger.debug(f'Fetching {topic} topic: offset={offset}, limit={limit}\n')
+    def fetch_sync_topic(self, domain, session_id_arg, topic_arg, limit=1000, offset=0):
+        logger.debug(f'Fetching {topic_arg} topic: offset={offset}, limit={limit}\n')
         params = {
             'limit': limit,
             'offset': offset
         }
-        url = f'{self.base_url}/{Routes.SYNC_SESSIONS % domain}/{session_id}/{topic}'
+        url = f'{self.base_url}{Routes.FETCH_SYNC_SESSION_TOPIC % (domain, session_id_arg, topic_arg)}'
         return self.get_http_request(url, params)
 
-    def retrieve_sync_feeds(self, domain):
+    def retrieve_sync_feeds(self):
         logger.debug('Retrieving SyncFeed')
-        url = self.base_url + Routes.SYNC_FEED % domain
+        url = self.base_url + Routes.SYNC_FEED
         return self.get_http_request(url)
 
     def fetch_filings(self, root_filing_nid):
