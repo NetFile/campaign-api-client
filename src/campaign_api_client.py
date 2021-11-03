@@ -39,20 +39,20 @@ class Routes:
 class CampaignApiClient:
     """Provides support for synchronizing local database with Campaign API filing data"""
 
-    def __init__(self, base_url, api_key, api_password, agency_id):
+    def __init__(self, base_url_arg, api_key_arg, api_password_arg, agency_id_arg):
         self.headers = {
             'Content-Type': 'application/json'
         }
-        self.base_url = base_url
-        self.user = api_key
-        self.password = api_password
-        self.agency_id = agency_id
+        self.base_url = base_url_arg
+        self.api_key = api_key_arg
+        self.api_secret = api_password_arg
+        self.agency_id = agency_id_arg
         self.httpSession = requests.Session()
 
     def __enter__(self):
         """
             This runs as the with block is set up.
-            """
+        """
         return self
 
     def __exit__(self, exc_type=None, exc_value=None, traceback=None):
@@ -109,8 +109,7 @@ class CampaignApiClient:
         return self.get_http_request(url)
 
     def execute_subscription_command(self, domain, sub_id, subscription_command_type):
-        logger.debug(
-            f"Executing {subscription_command_type} SyncSubscription command")
+        logger.debug(f"Executing {subscription_command_type} SyncSubscription command")
         ext = Routes.SYNC_SUBSCRIPTION_COMMAND % (
             domain, sub_id, subscription_command_type)
         url = self.base_url + ext
@@ -121,8 +120,12 @@ class CampaignApiClient:
 
     def query_subscriptions(self, domain, feed_id, limit=1000, offset=0):
         logger.debug('Retrieving available subscriptions\n')
-        params = {'feedId': feed_id, 'status': 'Active',
-                  'limit': limit, 'offset': offset}
+        params = {
+            'feedId': feed_id,
+            'status': 'Active',
+            'limit': limit,
+            'offset': offset
+        }
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % domain
         return self.get_http_request(url, params)
 
@@ -145,7 +148,10 @@ class CampaignApiClient:
 
     def fetch_sync_topic(self, domain, session_id, topic, limit=1000, offset=0):
         logger.debug(f'Fetching {topic} topic: offset={offset}, limit={limit}\n')
-        params = {'limit': limit, 'offset': offset}
+        params = {
+            'limit': limit,
+            'offset': offset
+        }
         url = f'{self.base_url}/{Routes.SYNC_SESSIONS % domain}/{session_id}/{topic}'
         return self.get_http_request(url, params)
 
@@ -162,8 +168,13 @@ class CampaignApiClient:
     def query_filings(self, query):
         logger.debug('Querying filings')
         url = self.base_url + Routes.QUERY_FILINGS
-        params = {'Origin': query.origin, 'FilingId': query.filing_id, 'FilingSpecification': query.filing_specification,
-                  'limit': query.limit, 'offset': query.offset}
+        params = {
+            'Origin': query.origin,
+            'FilingId': query.filing_id,
+            'FilingSpecification': query.filing_specification,
+            'limit': query.limit,
+            'offset': query.offset
+        }
         headers = {
             'Accept': 'application/json'
         }
@@ -177,9 +188,14 @@ class CampaignApiClient:
     def query_filing_elements(self, query):
         logger.debug('Querying Filing Elements')
         url = self.base_url + Routes.QUERY_FILING_ELEMENTS
-        params = {'Origin': query.origin, 'FilingId': query.filing_id,
-                  'ElementClassification': query.element_classification, 'ElementType': query.element_type,
-                  'limit': query.limit, 'offset': query.offset}
+        params = {
+            'Origin': query.origin,
+            'FilingId': query.filing_id,
+            'ElementClassification': query.element_classification,
+            'ElementType': query.element_type,
+            'limit': query.limit,
+            'offset': query.offset
+        }
         headers = {
             'Accept': 'application/json'
         }
@@ -189,8 +205,8 @@ class CampaignApiClient:
         logger.debug('Fetching Efile Content')
         url = self.base_url + Routes.FETCH_EFILE_CONTENT % root_filing_nid
         logger.debug(f'Making GET HTTP request to {url}')
-        response = self.httpSession.get(url, params={'contentType': 'efile'}, auth=(
-            self.user, self.password), headers=self.headers)
+        response = self.httpSession.get(url, params={'contentType': 'efile'}, auth=(self.api_key, self.api_secret),
+                                        headers=self.headers)
         if response.status_code not in [200, 201]:
             raise Exception(f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         file_content = response.text
@@ -200,8 +216,8 @@ class CampaignApiClient:
         logger.debug(f'Making POST HTTP request to {url}')
         try:
             params = {'aid': self.agency_id}
-            response = self.httpSession.post(url, auth=(self.user, self.password), data=json.dumps(
-                body), headers=self.headers, params=params)
+            response = self.httpSession.post(url, auth=(self.api_key, self.api_secret), data=json.dumps(body),
+                                             headers=self.headers, params=params)
         except Exception as ex:
             logger.error(ex)
             sys.exit()
@@ -209,13 +225,15 @@ class CampaignApiClient:
             raise Exception( f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         return response.json()
 
-    def get_http_request(self, url, params={}, headers=None):
+    def get_http_request(self, url, params=None, headers=None):
+        if params is None:
+            params = {}
         logger.debug(f'Making GET HTTP request to {url}')
         if headers is None:
             headers = self.headers
         try:
             params['aid'] = self.agency_id
-            response = self.httpSession.get(url, params=params, auth=(self.user, self.password), headers=headers)
+            response = self.httpSession.get(url, params=params, auth=(self.api_key, self.api_secret), headers=headers)
         except Exception as ex:
             logger.error(ex)
             sys.exit()
@@ -259,8 +277,7 @@ class SyncSessionCommandType(Enum):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Process Campaign API Sync Requests')
+    parser = argparse.ArgumentParser(description='Process Campaign API Sync Requests')
     parser.add_argument('--sync-topics', nargs=1, metavar='Comma Separated List of Topics',
                         help='Find existing active subscription, or create new one, and sync topics')
 
@@ -269,17 +286,14 @@ if __name__ == '__main__':
     # First make sure that the Campaign API is ready
     default_domain = 'cal'
     default_agency_id = 'SFO'
-    with CampaignApiClient(
-        api_url, api_key, api_password, default_agency_id) as campaign_api_client:
+    with CampaignApiClient(api_url, api_key, api_password, default_agency_id) as campaign_api_client:
         sys_report = campaign_api_client.fetch_system_report()
         try:
             if sys_report['generalStatus'].lower() != 'ready':
-                logger.error(
-                    'The Campaign API is not ready, current status is %s', sys_report['generalStatus'])
+                logger.error('The Campaign API is not ready, current status is %s', sys_report['generalStatus'])
                 sys.exit()
             if args.sync_topics:
-                logger.info(
-                    'Subscribe and sync topics')
+                logger.info('Subscribe and sync topics')
 
                 # Create SyncSubscription or use existing SyncSubscription
                 subscription_name = "My Sync Subscription"

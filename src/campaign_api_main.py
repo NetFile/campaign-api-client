@@ -7,6 +7,7 @@ import time
 from src import *
 from src.campaign_api_client import CampaignApiClient, SyncSessionCommandType
 
+
 def write_config_param(param, value):
     config[env.upper()][param] = value
     with open('../resources/config.json', 'w') as outfile:
@@ -26,14 +27,13 @@ def main():
     """
 
     domain = 'cal'
-    agency_id = 'SFO'
+    agency_id = 'TEST'
     sync_session = None
     api_client = None
     sub_id = None
     try:
         logger.info(f'Starting {domain} Campaign API synchronization lifecycle for Agency {agency_id}')
-        api_client = CampaignApiClient(
-            api_url, api_key, api_password, agency_id)
+        api_client = CampaignApiClient(api_url, api_key, api_password, agency_id)
 
         # Verify the system is ready
         sys_report = api_client.fetch_system_report()
