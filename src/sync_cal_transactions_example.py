@@ -30,7 +30,6 @@ def main():
     agency_id = 'TEST'
     sync_session = None
     api_client = None
-    sub_id = None
     try:
         logger.info(f'Starting {domain} Campaign API synchronization lifecycle for Agency {agency_id}')
         api_client = CampaignApiClient(api_url, api_key, api_password, agency_id)
@@ -40,12 +39,15 @@ def main():
         if sys_report['generalStatus'].lower() == 'ready':
             logger.info('Campaign API Sync is Ready')
 
-            # Create SyncSubscription or use existing SyncSubscription with cal_v101 feed specified
-            name = 'My Campaign API Feed'
-            topics = ['filing-activities', 'element-activities']
+            # Create new SyncSubscription
+            name = 'My CAL Transactions Subscription'
+            topics = ['element-activities']
+            specification_org = "cal"
+            element_classification = "UnItemizedTransaction"
             if not cal_subscription_id:
                 logger.info('Creating new "%s" subscription with name "%s"', domain, name)
-                subscription_response = api_client.create_subscription(domain, name, agency_id, topics)
+                # Filter for CAL Transactions only. Transactions are a property of Element-Activity, so filter that topic
+                subscription_response = api_client.create_subscription(domain, name, agency_id, topics, element_classification, specification_org)
                 sub_id = subscription_response['id']
 
                 # Write Subscription ID to config.json file
@@ -55,26 +57,24 @@ def main():
 
             # Create SyncSession
             logger.info('Creating sync session')
-            range_limit = 10000
-
-            # TODO - Add filter examples
-            sync_session_response = api_client.create_session(sub_id, range_limit)
-
-            # TODO - Fetch Feeds and Topics
-            feeds = api_client.retrieve_sync_feeds()
 
             sync_lifecycle_start = time.time()
-            if not sync_session_response['syncDataAvailable']:
-                logger.info('The Campaign API system has no sync data available')
+            if not api_client.peek_subscription(sub_id)['dataAvailable']:
+                logger.info(f'The Campaign API system currently has no sync data available for subscription {sub_id}')
+                return
 
-            while sync_session_response['syncDataAvailable']:
+            # while sync_session_response['syncDataAvailable']:
+            while api_client.peek_subscription(sub_id)['dataAvailable']:
                 session_start = time.time()
-                # Sync all available topics
+                # Sync specified topics
+                # for topic in topics:
                 for topic in topics:
                     topic_request_times = []
                     offset = 0
                     page_size = 1000
-                    logger.info(f'Synchronizing {topic}')
+                    range_limit = 10000
+                    logger.info(f'Synchronizing {topic} with elementClassification of {element_classification}')
+                    sync_session_response = api_client.create_session(sub_id, range_limit)
                     sync_session = sync_session_response['session']
                     session_id = sync_session['id']
                     start_time = time.time()
@@ -100,9 +100,6 @@ def main():
                 logger.info(f'Total time for sync session: {session_end - session_start} seconds\n')
 
                 api_client.execute_session_command(session_id, SyncSessionCommandType.Complete.name)
-
-                # Create a new syncSession looking for more available data to pull
-                sync_session_response = api_client.create_session(sub_id, range_limit)
 
             logger.info(f'Synchronization lifecycle complete\n\n')
             sync_lifecycle_end = time.time()

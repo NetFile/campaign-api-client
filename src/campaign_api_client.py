@@ -25,7 +25,8 @@ class Routes:
     SYNC_SUBSCRIPTION_COMMAND = '/%s/v101/sync/subscriptions/%s/commands/%s'
 
     # Parameter is the Subscription ID
-    FETCH_SUBSCRIPTION = '/%s/v101/sync/subscriptions/%s'
+    FETCH_SUBSCRIPTION = '/sync/v101/subscriptions/%s'
+    PEEK_SUBSCRIPTION = '/sync/v101/subscriptions/%s'
 
     # First parameter is the Root Filing NID
     FETCH_FILING = '/cal/v101/filings/%s'
@@ -85,36 +86,46 @@ class CampaignApiClient:
             logger.debug('\tComponent Build Version: %s', comp['buildVersion'])
         return sr
 
-    def peek_subscription(self, domain, sub_id):
-        logger.debug(f"Peeking SyncSubscription with id: {sub_id}")
-        ext = Routes.FETCH_SUBSCRIPTION % (domain, sub_id)
+    def peek_subscription(self, sub_id_arg):
+        logger.debug(f"Peeking SyncSubscription with id: {sub_id_arg}")
+        ext = Routes.PEEK_SUBSCRIPTION % sub_id_arg
         url = self.base_url + ext + '/peek'
         return self.get_http_request(url)
 
-    def create_subscription(self, domain, subscription_name_arg, filter_aid):
+    def create_subscription(self, domain, subscription_name_arg, filter_aid=None, filter_topics=None,
+                            element_classification_filter=None, specification_org_filter=None):
         logger.debug('Creating a SyncSubscription')
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % (domain)
         body = {
             'name': subscription_name_arg,
             'filter': {
-                'aid': filter_aid
             }
         }
+
+        if filter_topics:
+            body['filter']['topics'] = filter_topics
+        if filter_aid:
+            body['filter']['aid'] = filter_aid
+        if element_classification_filter:
+            body['filter']['elementClassification'] = element_classification_filter
+        if specification_org_filter:
+            body['filter']['specificationOrg'] = specification_org_filter
+
         return self.post_http_request(url, body)
 
-    def fetch_subscription(self, domain, sub_id):
-        logger.debug(f"Fetching SyncSubscription with id: {sub_id}")
-        ext = Routes.FETCH_SUBSCRIPTION % (domain, sub_id)
+    def fetch_subscription(self, domain, sub_id_arg):
+        logger.debug(f"Fetching SyncSubscription with id: {sub_id_arg}")
+        ext = Routes.FETCH_SUBSCRIPTION % (domain, sub_id_arg)
         url = self.base_url + ext
         return self.get_http_request(url)
 
-    def execute_subscription_command(self, domain, sub_id, subscription_command_type):
+    def execute_subscription_command(self, domain, sub_id_arg, subscription_command_type):
         logger.debug(f"Executing {subscription_command_type} SyncSubscription command")
         ext = Routes.SYNC_SUBSCRIPTION_COMMAND % (
-            domain, sub_id, subscription_command_type)
+            domain, sub_id_arg, subscription_command_type)
         url = self.base_url + ext
         body = {
-            'id': sub_id
+            'id': sub_id_arg
         }
         return self.post_http_request(url, body)
 
@@ -129,11 +140,11 @@ class CampaignApiClient:
         url = self.base_url + Routes.SYNC_SUBSCRIPTIONS % domain
         return self.get_http_request(url, params)
 
-    def create_session(self, sub_id, seq_range_limit=10000):
-        logger.debug(f'Creating a SyncSession using SyncSubscription {sub_id}')
+    def create_session(self, sub_id_arg, seq_range_limit=10000):
+        logger.debug(f'Creating a SyncSession using SyncSubscription {sub_id_arg}')
         url = f'{self.base_url}{Routes.SYNC_SESSIONS}'
         body = {
-            'subscriptionId': sub_id,
+            'subscriptionId': sub_id_arg,
             'sequenceRangeLimit': seq_range_limit
         }
         return self.post_http_request(url, body)
@@ -141,12 +152,9 @@ class CampaignApiClient:
     def execute_session_command(self, session_id_arg, session_command_type):
         logger.debug(f'Executing {session_command_type} SyncSession command')
         url = self.base_url + Routes.SYNC_SESSION_COMMAND % (session_id_arg, session_command_type)
-        # body = {
-        #     'subscriptionId': sub_id
-        # }
         return self.post_http_request(url)
 
-    def fetch_sync_topic(self, domain, session_id_arg, topic_arg, limit=1000, offset=0):
+    def read_sync_topic(self, domain, session_id_arg, topic_arg, limit=1000, offset=0):
         logger.debug(f'Fetching {topic_arg} topic: offset={offset}, limit={limit}\n')
         params = {
             'limit': limit,
@@ -242,13 +250,13 @@ class CampaignApiClient:
                 f'Error requesting Url: {url}, Response code: {response.status_code}. Error Message: {response.text}')
         return response.json()
 
-    def sync_topic_for_session(self, domain, session_id, topic_name, page_size):
+    def sync_topic_for_session(self, domain, session_id_arg, topic_name, page_size_arg):
         offset = 0
         has_next_page = True
         while has_next_page:
-            qr = self.fetch_sync_topic(domain, session_id, topic_name, page_size, offset)
+            qr = self.read_sync_topic(domain, session_id_arg, topic_name, page_size_arg, offset)
             has_next_page = qr['hasNextPage']
-            offset = offset + page_size
+            offset = offset + page_size_arg
 
             # TODO - Plug in your logic to handle the data here
             # for activity in qr['results']:
@@ -284,8 +292,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # First make sure that the Campaign API is ready
-    default_domain = 'cal'
-    default_agency_id = 'SFO'
+    default_domain = 'filing'
+    default_agency_id = 'TEST'
     with CampaignApiClient(api_url, api_key, api_password, default_agency_id) as campaign_api_client:
         sys_report = campaign_api_client.fetch_system_report()
         try:
@@ -296,15 +304,15 @@ if __name__ == '__main__':
                 logger.info('Subscribe and sync topics')
 
                 # Create SyncSubscription or use existing SyncSubscription
-                subscription_name = "My Sync Subscription"
+                sub_name = "My Sync Subscription"
                 topics = args.sync_topics[0].split(",")
                 sync_session = None
-                feed_name = 'cal_v101'
+                feed_name = 'filing_v101'
                 try:
                     # Create SyncSubscription or use existing SyncSubscription with feed specified
                     if not cal_subscription_id:
-                        logger.info('Creating new subscription with name "%s" and feed name "%s"', subscription_name, feed_name)
-                        subscription_response = campaign_api_client.create_subscription(default_domain, feed_name, subscription_name, default_agency_id)
+                        logger.info('Creating new subscription with name "%s" and feed name "%s"', sub_name, feed_name)
+                        subscription_response = campaign_api_client.create_subscription(default_domain, sub_name, default_agency_id)
                         sub_id = subscription_response['id']
 
                         # Write Subscription ID to config.json file
@@ -315,7 +323,7 @@ if __name__ == '__main__':
                     # Create SyncSession
                     logger.info('Creating sync session')
                     range_limit = 10000
-                    sync_session_response = campaign_api_client.create_session(default_domain, sub_id, range_limit)
+                    sync_session_response = campaign_api_client.create_session(sub_id, range_limit)
 
                     if not sync_session_response['syncDataAvailable']:
                         logger.info('The Campaign API system has no sync data available')
@@ -333,14 +341,14 @@ if __name__ == '__main__':
 
                         # Complete SyncSession
                         logger.info('Completing session')
-                        campaign_api_client.execute_session_command(default_domain, sess_id, SyncSessionCommandType.Complete.name, sub_id)
-                        sync_session_response = campaign_api_client.create_session(default_domain, sub_id, range_limit)
+                        campaign_api_client.execute_session_command(sess_id, SyncSessionCommandType.Complete.name)
+                        sync_session_response = campaign_api_client.create_session(sub_id, range_limit)
 
                     logger.info('Sync Complete')
                 except Exception as ex:
                     # Cancel Session on error
                     if sync_session is not None:
-                        campaign_api_client.execute_session_command(default_domain, sync_session.id, SyncSessionCommandType.Cancel.name, sub_id)
+                        campaign_api_client.execute_session_command(sync_session.id, SyncSessionCommandType.Cancel.name)
                     logger.error('Error attempting to sync: %s', ex)
                     sys.exit()
         except Exception as ex:
