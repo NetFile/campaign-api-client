@@ -26,16 +26,16 @@ class Routes:
 
     # Parameter is the Subscription ID
     FETCH_SUBSCRIPTION = '/sync/v101/subscriptions/%s'
-    PEEK_SUBSCRIPTION = '/sync/v101/subscriptions/%s'
+    PEEK_SUBSCRIPTION = '/sync/v101/subscriptions/%s/peek'
 
     # First parameter is the Root Filing NID
-    FETCH_FILING = '/cal/v101/filings/%s'
-    FETCH_EFILE_CONTENT = '/cal/v101/filings/%s/contents/efiling'
-    QUERY_FILINGS = '/cal/v101/filings'
+    FETCH_FILING = '/filing/v101/filings/%s'
+    FETCH_EFILE_CONTENT = '/filing/v101/filings/%s/contents/efiling'
+    QUERY_FILINGS = '/filing/v101/filings'
 
     # First parameter is the Element ID
-    FETCH_FILING_ELEMENTS = '/cal/v101/filing-elements/%s'
-    QUERY_FILING_ELEMENTS = '/cal/v101/filing-elements'
+    FETCH_FILING_ELEMENTS = '/cal/v101/transaction-elements/%s'
+    QUERY_FILING_ELEMENTS = '/cal/v101/transaction-elements'
 
 
 class CampaignApiClient:
@@ -89,7 +89,7 @@ class CampaignApiClient:
     def peek_subscription(self, sub_id_arg):
         logger.debug(f"Peeking SyncSubscription with id: {sub_id_arg}")
         ext = Routes.PEEK_SUBSCRIPTION % sub_id_arg
-        url = self.base_url + ext + '/peek'
+        url = self.base_url + ext
         return self.get_http_request(url)
 
     def create_subscription(self, domain, subscription_name_arg, filter_aid=None, filter_topics=None,
@@ -312,7 +312,7 @@ if __name__ == '__main__':
                     # Create SyncSubscription or use existing SyncSubscription with feed specified
                     if not cal_subscription_id:
                         logger.info('Creating new subscription with name "%s" and feed name "%s"', sub_name, feed_name)
-                        subscription_response = campaign_api_client.create_subscription(default_domain, sub_name, default_agency_id)
+                        subscription_response = campaign_api_client.create_subscription(default_domain, sub_name, default_agency_id, topics)
                         sub_id = subscription_response['id']
 
                         # Write Subscription ID to config.json file
@@ -338,6 +338,8 @@ if __name__ == '__main__':
                             logger.info(f'Synchronizing {topic}')
                             session_id = sync_session['id']
                             campaign_api_client.sync_topic_for_session(default_domain, session_id, topic, page_size)
+
+                            # Fetch Filing Contents
 
                         # Complete SyncSession
                         logger.info('Completing session')

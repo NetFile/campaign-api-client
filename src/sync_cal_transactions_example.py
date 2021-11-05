@@ -19,10 +19,7 @@ def main():
     This demonstrates the complete lifecycle of the Campaign API sync process.
     1) Create a Cal SyncSubscription
     2) Create a Cal SyncSession using the SyncSubscription. This will be the start of the session
-    3) Synchronize Filing Activities
-    4) Synchronize Element Activities
-    5) Synchronize Transaction Activities
-    6) Synchronize Unitemized Transaction Activities
+    3) Synchronize CAL Element Activities with element classification of UnitemizedTransaction
     7) Complete the SyncSession. This will be the end of the session
     """
 
@@ -46,7 +43,7 @@ def main():
             element_classification = "UnItemizedTransaction"
             if not cal_subscription_id:
                 logger.info('Creating new "%s" subscription with name "%s"', domain, name)
-                # Filter for CAL Transactions only. Transactions are a property of Element-Activity, so filter that topic
+                # Filter for CAL Unimtemized Transactions only. UnitemizedTransactions are a property of Element-Activity, so filter that topic
                 subscription_response = api_client.create_subscription(domain, name, agency_id, topics, element_classification, specification_org)
                 sub_id = subscription_response['id']
 
@@ -67,7 +64,6 @@ def main():
             while api_client.peek_subscription(sub_id)['dataAvailable']:
                 session_start = time.time()
                 # Sync specified topics
-                # for topic in topics:
                 for topic in topics:
                     topic_request_times = []
                     offset = 0
