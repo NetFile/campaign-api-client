@@ -21,13 +21,11 @@ def main():
     2) Create a Cal SyncSession using the SyncSubscription. This will be the start of the session
     3) Synchronize Filing Activities
     4) Synchronize Element Activities
-    5) Synchronize Transaction Activities
-    6) Synchronize Unitemized Transaction Activities
-    7) Complete the SyncSession. This will be the end of the session
+    5) Complete the SyncSession. This will be the end of the session
     """
 
     domain = 'filing'
-    agency_id = 'TEST'
+    agency_id = 'OAK'
     sync_session = None
     api_client = None
     sub_id = None
@@ -64,6 +62,12 @@ def main():
             feeds = api_client.retrieve_sync_feeds()
 
             sync_lifecycle_start = time.time()
+
+            # Can take a 'peek' at the subscription to check for available data
+            peek_sub_response = api_client.peek_subscription(sub_id)
+            if peek_sub_response['dataAvailable']:
+                print("Sync Data Available")
+
             if not sync_session_response['syncDataAvailable']:
                 logger.info('The Campaign API system has no sync data available')
 

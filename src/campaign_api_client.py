@@ -291,10 +291,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # First make sure that the Campaign API is ready
     default_domain = 'filing'
     default_agency_id = 'TEST'
     with CampaignApiClient(api_url, api_key, api_password, default_agency_id) as campaign_api_client:
+        # First make sure that the Campaign API is ready
         sys_report = campaign_api_client.fetch_system_report()
         try:
             if sys_report['generalStatus'].lower() != 'ready':
