@@ -20,7 +20,7 @@ env = 'peek'
 
 # Subscription id can be stored in config
 cal_subscription_id = config[env.upper()]['CAL_SUBSCRIPTION_ID']
-global_subscription_id = config[env.upper()]['GLOBAL_SUBSCRIPTION_ID']
+# global_subscription_id = config[env.upper()]['GLOBAL_SUBSCRIPTION_ID']
 
 # Base URL of the API. Example - "https://netfile.com/filing/api"
 api_url = config[env.upper()]['API_URL']
