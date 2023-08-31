@@ -7,6 +7,10 @@ file_handler = logging.FileHandler('../logs/log.txt', 'a')
 formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
 stream_handler.setFormatter(formatter)
 file_handler.setFormatter(formatter)
+
+if logger.hasHandlers():
+    logger.handlers.clear()
+#
 logger.addHandler(stream_handler)
 logger.addHandler(file_handler)
 # Set the logging level to logging.DEBUG for verbose output, or to logging.INFO for less verbose output
